@@ -28,7 +28,11 @@
 #if !DOXYGEN
 #include <stdint.h>
 #include "Stream.h"
+<<<<<<< HEAD:drivers/BCM/Wire.h
 #include "RPi.h"
+=======
+#include "BCM.h"
+>>>>>>> development:drivers/BCM/Wire.h
 
 #define BUFFER_LENGTH 32
 
