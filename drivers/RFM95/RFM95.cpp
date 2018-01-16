@@ -187,7 +187,7 @@ LOCAL bool RFM95_initialise(const uint32_t frequencyHz)
 	(void)RFM95_setTxPowerLevel(MY_RFM95_TX_POWER_DBM);
 	// IRQ
 	hwPinMode(MY_RFM95_IRQ_PIN, INPUT);
-#if defined(SPI_HAS_TRANSACTION) && !defined(ESP8266) && !defined(MY_SOFTSPI)
+#if defined(SPI_HAS_TRANSACTION) && !defined(ESP8266) && !defined(ARDUINO_ARCH_ESP32) && !defined(MY_SOFTSPI)
 	RFM95_SPI.usingInterrupt(MY_RFM95_IRQ_NUM);
 #endif
 

@@ -236,7 +236,7 @@ LOCAL bool RFM69_initialise(const uint32_t frequencyHz)
 	(void)RFM69_setTxPowerLevel(MY_RFM69_TX_POWER_DBM);
 	// IRQ
 	hwPinMode(MY_RFM69_IRQ_PIN, INPUT);
-#if defined (SPI_HAS_TRANSACTION) && !defined (ESP8266) && !defined (MY_SOFTSPI)
+#if defined (SPI_HAS_TRANSACTION) && !defined (ESP8266) && !defined(ARDUINO_ARCH_ESP32) && !defined (MY_SOFTSPI) 
 	RFM69_SPI.usingInterrupt(digitalPinToInterrupt(MY_RFM69_IRQ_PIN));
 #endif
 

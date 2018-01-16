@@ -29,7 +29,7 @@
 typedef unsigned char byte;
 #define printf_P printf
 #define PSTR(x) (x)
-#elif defined(ARDUINO_ARCH_ESP8266)
+#elif defined(ARDUINO_ARCH_ESP8266) || defined(ARDUINO_ARCH_ESP32)
 #include <pgmspace.h>
 #elif defined(ARDUINO_ARCH_SAMD)
 #define printf_P printf
