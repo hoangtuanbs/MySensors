@@ -95,8 +95,8 @@ static bool skipSign(MyMessage &msg);
 #else // not MY_SIGNING_FEATURE
 #define signerBackendCheckTimer() true
 #endif // MY_SIGNING_FEATURE
-static void prepareSigningPresentation(MyMessage &msg, uint8_t destination);
-static bool signerInternalProcessPresentation(MyMessage &msg);
+static void s_PrepareSigningPresentation(C_Gateway *gw, MyMessage &msg, uint8_t destination);
+static bool s_SignerInternalProcessPresentation(C_Gateway *gw, MyMessage &msg);
 static bool signerInternalProcessNonceRequest(MyMessage &msg);
 static bool signerInternalProcessNonceResponse(MyMessage &msg);
 #if (defined(MY_ENCRYPTION_FEATURE) || defined(MY_SIGNING_FEATURE)) &&\
@@ -104,7 +104,12 @@ static bool signerInternalProcessNonceResponse(MyMessage &msg);
 static bool signerInternalValidatePersonalization(void);
 #endif
 
-void signerInit(void)
+C_Signer::C_Signer(C_Gateway *gw)
+{
+	m_Gateway = gw;
+}
+
+void C_Signer::signerInit(void)
 {
 #if defined(MY_SIGNING_FEATURE)
 	stateValid = true;
@@ -139,9 +144,9 @@ void signerInit(void)
 #endif
 }
 
-void signerPresentation(MyMessage &msg, uint8_t destination)
+void C_Signer::signerPresentation(MyMessage &msg, uint8_t destination)
 {
-	prepareSigningPresentation(msg, destination);
+	s_PrepareSigningPresentation(m_Gateway, msg, destination);
 
 #if defined(MY_SIGNING_REQUEST_SIGNATURES)
 	msg.data[1] |= SIGNING_PRESENTATION_REQUIRE_SIGNATURES;
@@ -156,7 +161,7 @@ void signerPresentation(MyMessage &msg, uint8_t destination)
 	SIGN_DEBUG(PSTR("SGN:PRE:WHI NREQ\n")); // Whitelisting not required
 #endif
 
-	if (!_sendRoute(msg)) {
+	if (!m_Gateway->_sendRoute(msg)) {
 		SIGN_DEBUG(PSTR("!SGN:PRE:XMT,TO=%" PRIu8 " FAIL\n"),
 		           destination); // Failed to transmit presentation!
 	} else {
@@ -165,16 +170,16 @@ void signerPresentation(MyMessage &msg, uint8_t destination)
 
 	if (destination == GATEWAY_ADDRESS) {
 		SIGN_DEBUG(PSTR("SGN:PRE:WAIT GW\n")); // Waiting for GW to send signing preferences...
-		wait(2000, C_INTERNAL, I_SIGNING_PRESENTATION);
+		m_Gateway->wait(2000, C_INTERNAL, I_SIGNING_PRESENTATION);
 	}
 }
 
-bool signerProcessInternal(MyMessage &msg)
+bool C_Signer::signerProcessInternal(MyMessage &msg)
 {
 	bool ret;
 	switch (msg.type) {
 	case I_SIGNING_PRESENTATION:
-		ret = signerInternalProcessPresentation(msg);
+		ret = s_SignerInternalProcessPresentation(m_Gateway, msg);
 		break;
 	case I_NONCE_REQUEST:
 		ret = signerInternalProcessNonceRequest(msg);
@@ -189,12 +194,12 @@ bool signerProcessInternal(MyMessage &msg)
 	return ret;
 }
 
-bool signerCheckTimer(void)
+bool C_Signer::signerCheckTimer(void)
 {
 	return signerBackendCheckTimer();
 }
 
-bool signerSignMsg(MyMessage &msg)
+bool C_Signer::signerSignMsg(MyMessage &msg)
 {
 	bool ret;
 #if defined(MY_SIGNING_FEATURE)
@@ -211,7 +216,7 @@ bool signerSignMsg(MyMessage &msg)
 			} else {
 				// Send nonce-request
 				_signingNonceStatus=SIGN_WAITING_FOR_NONCE;
-				if (!_sendRoute(build(_msgSign, msg.destination, msg.sensor, C_INTERNAL,
+				if (!m_Gateway->_sendRoute(build(_msgSign, msg.destination, msg.sensor, C_INTERNAL,
 				                      I_NONCE_REQUEST).set(""))) {
 					SIGN_DEBUG(PSTR("!SGN:SGN:NCE REQ,TO=%" PRIu8 " FAIL\n"),
 					           msg.destination); // Failed to transmit nonce request!
@@ -263,7 +268,7 @@ bool signerSignMsg(MyMessage &msg)
 	return ret;
 }
 
-bool signerVerifyMsg(MyMessage &msg)
+bool C_Signer::signerVerifyMsg(MyMessage &msg)
 {
 	bool verificationResult = true;
 	// Before processing message, reject unsigned messages if signing is required and check signature
@@ -319,26 +324,32 @@ bool signerVerifyMsg(MyMessage &msg)
 	return verificationResult;
 }
 
+bool C_Signer::signerPutNonce(MyMessage &msg) 
+{
+	SIGN_DEBUG(PST("Method not yet implemented"));
+	return false;
+}
+
 Sha256Class _soft_sha256;
 
-void signerSha256Init(void)
+void C_SHA256Util::signerSha256Init(void)
 {
 	_soft_sha256.init();
 }
 
-void signerSha256Update(const uint8_t* data, size_t sz)
+void C_SHA256Util::signerSha256Update(const uint8_t* data, size_t sz)
 {
 	for (size_t i = 0; i < sz; i++) {
 		_soft_sha256.write(data[i]);
 	}
 }
 
-uint8_t* signerSha256Final(void)
+uint8_t* C_SHA256Util::signerSha256Final(void)
 {
 	return _soft_sha256.result();
 }
 
-int signerMemcmp(const void* a, const void* b, size_t sz)
+int C_SHA256Util::signerMemcmp(const void* a, const void* b, size_t sz)
 {
 	int retVal;
 	size_t i;
@@ -402,10 +413,10 @@ static bool skipSign(MyMessage &msg)
 #endif
 
 // Helper to prepare a signing presentation message
-static void prepareSigningPresentation(MyMessage &msg, uint8_t destination)
+static void s_PrepareSigningPresentation(C_Gateway *gw, MyMessage &msg, uint8_t destination)
 {
 	// Only supports version 1 for now
-	(void)build(msg, destination, NODE_SENSOR_ID, C_INTERNAL, I_SIGNING_PRESENTATION).set("");
+	(void)gw->build(msg, destination, NODE_SENSOR_ID, C_INTERNAL, I_SIGNING_PRESENTATION).set("");
 	mSetLength(msg, 2);
 	mSetPayloadType(msg, P_CUSTOM);		// displayed as hex
 	msg.data[0] = SIGNING_PRESENTATION_VERSION_1;
@@ -413,7 +424,7 @@ static void prepareSigningPresentation(MyMessage &msg, uint8_t destination)
 }
 
 // Helper to process presentation messages
-static bool signerInternalProcessPresentation(MyMessage &msg)
+static bool s_SignerInternalProcessPresentation(C_Gateway *gw, MyMessage &msg)
 {
 	const uint8_t sender = msg.sender;
 #if defined(MY_SIGNING_FEATURE)
@@ -466,7 +477,7 @@ static bool signerInternalProcessPresentation(MyMessage &msg)
 	// Inform sender about our preference if we are a gateway, but only require signing if the sender
 	// required signing unless we explicitly configure it to
 #if defined(MY_GATEWAY_FEATURE)
-	prepareSigningPresentation(msg, sender);
+	s_PrepareSigningPresentation(gw, msg, sender);
 #if defined(MY_SIGNING_REQUEST_SIGNATURES)
 #if defined(MY_SIGNING_WEAK_SECURITY)
 	if (DO_SIGN(sender)) {
@@ -493,7 +504,7 @@ static bool signerInternalProcessPresentation(MyMessage &msg)
 		SIGN_DEBUG(PSTR("SGN:PRE:WHI NREQ,TO=%" PRIu8 "\n"),
 		           sender); // Inform node that we do not require whitelisting
 	}
-	if (!_sendRoute(msg)) {
+	if (!m_Gateway->_sendRoute(msg)) {
 		SIGN_DEBUG(PSTR("!SGN:PRE:XMT,TO=%" PRIu8 " FAIL\n"),
 		           sender); // Failed to transmit signing presentation!
 	} else {
@@ -504,10 +515,10 @@ static bool signerInternalProcessPresentation(MyMessage &msg)
 #if defined(MY_GATEWAY_FEATURE)
 	// If we act as gateway and do not have the signing feature and receive a signing request we still
 	// need to do make sure the requester does not believe the gateway still require signatures
-	prepareSigningPresentation(msg, sender);
+	s_PrepareSigningPresentation(gw, msg, sender);
 	SIGN_DEBUG(PSTR("SGN:PRE:NSUP,TO=%" PRIu8 "\n"),
 	           sender); // Informing node that we do not support signing
-	if (!_sendRoute(msg)) {
+	if (!gw->_sendRoute(msg)) {
 		SIGN_DEBUG(PSTR("!SGN:PRE:XMT,TO=%" PRIu8 " FAIL\n"),
 		           sender); // Failed to transmit signing presentation!
 	} else {
@@ -539,7 +550,7 @@ static bool signerInternalProcessNonceRequest(MyMessage &msg)
 	}
 #endif // MY_NODE_LOCK_FEATURE
 	if (signerBackendGetNonce(msg)) {
-		if (!_sendRoute(build(msg, msg.sender, NODE_SENSOR_ID, C_INTERNAL, I_NONCE_RESPONSE))) {
+		if (!m_Gateway->_sendRoute(build(msg, msg.sender, NODE_SENSOR_ID, C_INTERNAL, I_NONCE_RESPONSE))) {
 			SIGN_DEBUG(PSTR("!SGN:NCE:XMT,TO=%" PRIu8 " FAIL\n"), msg.sender); // Failed to transmit nonce!
 		} else {
 			SIGN_DEBUG(PSTR("SGN:NCE:XMT,TO=%" PRIu8 "\n"), msg.sender);

@@ -32,10 +32,11 @@
 
 void MySensorsTask(void *pvParameters)
 {
-	_begin();			// Startup MySensors library
+	C_Gateway gw;
+	gw._begin();			// Startup MySensors library
 	for (;;) {
 		micros();		// update overflow
-		_process();		// Process incoming data
+		gw._process();		// Process incoming data
 		if (loop) {
 			loop();		// Call sketch loop
 		}

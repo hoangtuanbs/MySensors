@@ -84,35 +84,65 @@
 #define GATEWAY_DEBUG(x,...)									//!< debug NULL
 #endif
 
-/**
- * @brief Process gateway-related messages
- */
-void gatewayTransportProcess(void);
+class C_IGatewayTransport
+{
+	
+	/**
+	 * Return this nodes id.
+	 */
+	public: virtual uint8_t getNodeId(void);
 
-/**
- * @brief Initialize gateway transport driver
- * @return true if transport initialized
- */
-bool gatewayTransportInit(void);
+	/**
+	* Sends node information to the gateway.
+	*/
+	public: virtual void presentNode(void);
 
-/**
- * @brief Send message to controller
- * @param message to send
- * @return true if message delivered
- */
-bool gatewayTransportSend(MyMessage &message);
+	public: virtual void _registerNode(void);
+	/**
+	 * @brief Process gateway-related messages
+	 */
+	public: virtual void gatewayTransportProcess(void);
 
-/**
- * @brief Check if a new message is available from controller
- * @return true if message available
- */
-bool gatewayTransportAvailable(void);
+	/**
+	 * @brief Initialize gateway transport driver
+	 * @return true if transport initialized
+	 */
+	public: virtual bool gatewayTransportInit(void);
 
-/**
- * @brief Pick up last message received from controller
- * @return message
- */
-MyMessage& gatewayTransportReceive(void);
+	/**
+	 * @brief Send message to controller
+	 * @param message to send
+	 * @return true if message delivered
+	 */
+	public: virtual bool gatewayTransportSend(MyMessage &message);
+
+	/**
+	 * @brief Check if a new message is available from controller
+	 * @return true if message available
+	 */
+	public: virtual bool gatewayTransportAvailable(void);
+
+	/**
+	 * Wait for a specified amount of time to pass.  Keeps process()ing.
+	 * This does not power-down the radio nor the Arduino.
+	 * Because this calls process() in a loop, it is a good way to wait
+	 * in your loop() on a repeater node or sensor that listens to messages.
+	 * @param waitingMS Number of milliseconds to wait.
+	 */
+	public: virtual void wait(const uint32_t waitingMS);
+	/**
+	 * @brief Pick up last message received from controller
+	 * @return message
+	 */
+	public: virtual MyMessage& gatewayTransportReceive(void);
+
+	public: virtual MyMessage& buildGw(MyMessage &msg, const uint8_t type);	
+
+	public: virtual void receive(const MyMessage &message);
+
+	private: virtual bool _processInternalMessages(void);
+};
+
 
 #endif /* MyGatewayTransportEthernet_h */
 

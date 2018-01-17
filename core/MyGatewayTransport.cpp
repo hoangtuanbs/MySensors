@@ -25,7 +25,7 @@ extern bool transportSendRoute(MyMessage &message);
 extern MyMessage _msg;
 extern MyMessage _msgTmp;
 
-inline void gatewayTransportProcess(void)
+void C_IGatewayTransport::gatewayTransportProcess(void)
 {
 	if (gatewayTransportAvailable()) {
 		_msg = gatewayTransportReceive();
@@ -55,10 +55,8 @@ inline void gatewayTransportProcess(void)
 					_processInternalMessages();
 				}
 			} else {
-				// Call incoming message callback if available
-				if (receive) {
-					receive(_msg);
-				}
+				// Call incoming message callback if available	
+				receive(_msg);
 			}
 		} else {
 #if defined(MY_SENSOR_NETWORK)
@@ -67,3 +65,5 @@ inline void gatewayTransportProcess(void)
 		}
 	}
 }
+
+void C_IGatewayTransport::receive(const MyMessage &message) {}

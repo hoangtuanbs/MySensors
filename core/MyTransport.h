@@ -159,6 +159,7 @@
 #ifndef MyTransport_h
 #define MyTransport_h
 
+#include "MyGatewayTransport.h"
 #include "hal/transport/MyTransportHAL.h"
 
 #ifndef MY_TRANSPORT_MAX_TX_FAILURES
@@ -225,7 +226,7 @@
 /**
  * @brief Callback type
  */
-typedef void(*transportCallback_t)(void);
+typedef void(*transportCallback_t)(C_IGatewayTransport*);
 
 /**
  * @brief Node configuration

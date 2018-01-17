@@ -18,6 +18,7 @@
  */
 
 #include "MyTransport.h"
+#include "MyGatewayTransport.h"
 
 // debug
 #if defined(MY_DEBUG_VERBOSE_TRANSPORT)
@@ -44,6 +45,7 @@ static transportConfig_t _transportConfig;
 
 // callback transportOk
 transportCallback_t _transportReady_cb = NULL;
+C_IGatewayTransport *m_Gateway = NULL;
 
 // enhanced ID assignment
 #if !defined(MY_GATEWAY_FEATURE) && (MY_NODE_ID == AUTO)
@@ -297,7 +299,7 @@ void stReadyTransition(void)
 	_transportSM.failedUplinkTransmissions = 0u;	// reset failed uplink TX counter
 	// callback
 	if (_transportReady_cb) {
-		_transportReady_cb();
+		_transportReady_cb(m_Gateway);
 	}
 }
 
@@ -1013,9 +1015,10 @@ bool transportSendWrite(const uint8_t to, MyMessage &message)
 	return result;
 }
 
-void transportRegisterReadyCallback(transportCallback_t cb)
+void transportRegisterReadyCallback(transportCallback_t cb, C_IGatewayTransport *gw)
 {
 	_transportReady_cb = cb;
+	m_Gateway = gw;
 }
 
 uint8_t transportGetNodeId(void)

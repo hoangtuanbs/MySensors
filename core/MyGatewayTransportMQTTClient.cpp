@@ -56,7 +56,7 @@ static bool _MQTT_connecting = true;
 static bool _MQTT_available = false;
 static MyMessage _MQTT_msg;
 
-bool gatewayTransportSend(MyMessage &message)
+bool C_IGatewayTransport::gatewayTransportSend(MyMessage &message)
 {
 	if (!_MQTT_client.connected()) {
 		return false;
@@ -79,7 +79,7 @@ void incomingMQTT(char* topic, uint8_t* payload, unsigned int length)
 	_MQTT_available = protocolMQTTParse(_MQTT_msg, topic, payload, length);
 }
 
-bool reconnectMQTT(void)
+bool reconnectMQTT(C_IGatewayTransport *gw)
 {
 	GATEWAY_DEBUG(PSTR("GWT:RMQ:MQTT RECONNECT\n"));
 	// Attempt to connect
@@ -91,7 +91,7 @@ bool reconnectMQTT(void)
 		GATEWAY_DEBUG(PSTR("GWT:RMQ:MQTT CONNECTED\n"));
 
 		// Send presentation of locally attached sensors (and node if applicable)
-		presentNode();
+		gw->presentNode();
 
 		// Once connected, publish an announcement...
 		//_MQTT_client.publish("outTopic","hello world");
@@ -102,11 +102,11 @@ bool reconnectMQTT(void)
 	return false;
 }
 
-bool gatewayTransportConnect(void)
+bool gatewayTransportConnect(C_IGatewayTransport *gw)
 {
 #if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
 	while (WiFi.status() != WL_CONNECTED) {
-		wait(500);
+		gw->wait(500);
 		GATEWAY_DEBUG(PSTR("GWT:TPC:CONNECTING...\n"));
 	}
 	GATEWAY_DEBUG(PSTR("GWT:TPC:IP=%s\n"),WiFi.localIP().toString().c_str());
@@ -134,7 +134,7 @@ bool gatewayTransportConnect(void)
 	return true;
 }
 
-bool gatewayTransportInit(void)
+bool C_IGatewayTransport::gatewayTransportInit(void)
 {
 	_MQTT_connecting = true;
 #if defined(MY_CONTROLLER_IP_ADDRESS)
@@ -173,13 +173,13 @@ bool gatewayTransportInit(void)
 	(void)WiFi.begin(MY_ESP32_SSID, MY_ESP32_PASSWORD, 0, MY_ESP32_BSSID);
 #endif /* End of MY_GATEWAY_ESP32*/
 
-	gatewayTransportConnect();
+	gatewayTransportConnect(this);
 
 	_MQTT_connecting = false;
 	return true;
 }
 
-bool gatewayTransportAvailable(void)
+bool C_IGatewayTransport::gatewayTransportAvailable(void)
 {
 	if (_MQTT_connecting) {
 		return false;
@@ -188,8 +188,8 @@ bool gatewayTransportAvailable(void)
 	//Ethernet.maintain();
 	if (!_MQTT_client.connected()) {
 		//reinitialise client
-		if (gatewayTransportConnect()) {
-			reconnectMQTT();
+		if (gatewayTransportConnect(this)) {
+			reconnectMQTT(this);
 		}
 		return false;
 	}
@@ -197,7 +197,7 @@ bool gatewayTransportAvailable(void)
 	return _MQTT_available;
 }
 
-MyMessage & gatewayTransportReceive(void)
+MyMessage & C_IGatewayTransport::gatewayTransportReceive(void)
 {
 	// Return the last parsed message
 	_MQTT_available = false;

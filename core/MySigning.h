@@ -603,146 +603,168 @@ typedef struct {
 /** @brief Helper macro to determine the number of elements in a array */
 #define NUM_OF(x) (sizeof(x)/sizeof(x[0]))
 
-/**
- * @brief Initializes signing infrastructure and associated backend.
- *
- * This function makes sure that the internal states of the signing infrastructure
- * is set to a known initial state.
- * \n@b Usage: This function should be called before any signing related operations take place.
- */
-void signerInit(void);
+class C_SHA256Util
+{
 
-/**
- * @brief Does signing specific presentation for a node.
- *
- * This function makes sure any signing related presentation info is shared with the other part.
- * The presentation of the gateways signing preferences is done in @ref signerProcessInternal().
- * \n@b Usage: This function should be called by the presentation routine of the MySensors library.
- * You only need to call this directly from a sketch to set up a node to node signed message exchange.
- * If you do call this directly from a sketch, and you at some point change your sketch to go from
- * requiring signing to not requiring signatures, you need to present this change to the node at least
- * once, so it can update its requirements tables accordingly. Or it will keep believing that this node
- * require signatures and attempt to send signed messages to it.
- *
- * @param msg Message buffer to use.
- * @param destination Node ID of the destination.
- */
-void signerPresentation(MyMessage &msg, uint8_t destination);
+	/**
+	 * @brief Initialize a hash calculation session.
+	 *
+	 * Any ongoing calculation session will be terminated/reset.
+	 */
+	static void signerSha256Init(void);
 
-/**
- * @brief Manages internal signing message handshaking.
- *
- * This function takes care of signing related message handshaking such as nonce exchange.
- * \n@b Usage: This function should be called by the incoming message handler before any further message
- * processing is performed on internal messages. This function should only be called for @ref C_INTERNAL class
- * messages.
- *
- * @param msg Message buffer to process.
- * @returns @c true if caller should stop further message processing.
- */
-bool signerProcessInternal(MyMessage &msg);
+	/**
+	 * @brief Add data to an ongoing hash calculation session.
+	 *
+	 * More data can be added by repeated calls to this function.
+	 *
+	 * @param data Buffer with data to add.
+	 * @param sz Size of data buffer.
+	 */
+	static void signerSha256Update(const uint8_t* data, size_t sz);
 
-/**
- * @brief Check timeout of verification session.
- *
- * Nonce will be purged if it takes too long for a signed message to be sent to the receiver.
- * \n@b Usage: This function should be called on regular intervals, typically within some process loop.
- *
- * @returns @c true if session is still valid.
- */
-bool signerCheckTimer(void);
+	/**
+	 * @brief Finalize an ongoing hash calculation session and return the hash.
+	 *
+	 * The returned hash size is always 32 bytes. Buffer can be assumed to be valid
+	 * until @ref signerSha256Init() is called again.
+	 *
+	 * @returns Buffer with 32-byte hash.
+	 */
+	static uint8_t* signerSha256Final(void);
 
-/**
- * @brief Get nonce from provided message and store for signing operations.
- *
- * Returns @c false if subsystem is busy processing an ongoing signing operation.<br>
- * Returns @c false if signing identifier found in message is not supported by the used backend.<br>
- * If successful, this marks the start of a signing operation at the sending side so
- * implementation is expected to do any necessary initializations within this call.
- * \n@b Usage: This function is typically called as action when receiving a @ref I_NONCE_RESPONSE
- * message.
- *
- * @param msg The message to get the nonce from.
- * @returns @c true if successful, else @c false.
- */
-bool signerPutNonce(MyMessage &msg);
+	/**
+	 * @brief Do a timing neutral memory comparison.
+	 *
+	 * The function behaves similar to memcmp with the difference that it will
+	 * always use the same number of instructions for a given number of bytes,
+	 * no matter how the two buffers differ and the response is either 0 or -1.
+	 *
+	 * @param a First buffer for comparison.
+	 * @param b Second buffer for comparison.
+	 * @param sz The number of bytes to compare.
+	 * @returns 0 if buffers match, -1 if they do not.
+	 */
+	static int signerMemcmp(const void* a, const void* b, size_t sz);
+};
 
-/**
- * @brief Signs provided message. All remaining space in message payload buffer is used for
- * signing identifier and signature.
- *
- * Nonce used for signature calculation is the one generated previously within @ref signerProcessInternal().<br>
- * Nonce will be cleared when this function is called to prevent re-use of nonce.<br>
- * Returns @c false if subsystem is busy processing an ongoing signing operation.<br>
- * Returns @c false if not two bytes or more of free payload space is left in provided message.<br>
- * This ends a signing operation at the sending side so implementation is expected to do any
- * deinitializations and enter a power saving state within this call.
- * \n@b Usage: This function is typically called as action when receiving a @ref I_NONCE_RESPONSE
- * message and after @ref signerPutNonce() has successfully been executed.
- *
- * @param msg The message to sign.
- * @returns @c true if successful, else @c false.
-*/
-bool signerSignMsg(MyMessage &msg);
+class C_ISigner
+{
+	public: virtual void signerInit(void);
 
-/**
- * @brief Verifies signature in provided message.
- *
- * Nonce used for verification is the one previously set using @ref signerPutNonce().<br>
- * Nonce will be cleared when this function is called to prevent re-use of nonce.<br>
- * Returns @c false if subsystem is busy processing an ongoing signing operation.<br>
- * Returns @c false if signing identifier found in message is not supported by the used backend.<br>
- * This ends a signing operation at the receiving side so implementation is expected to do any
- * deinitializations and enter a power saving state within this call.
- * \n@b Usage: This function is typically called when receiving a message that is flagged as signed
- * and @ref MY_SIGNING_REQUEST_SIGNATURES is activated.
- *
- * @param msg The message to verify.
- * @returns @c true if successful, else @c false.
- */
-bool signerVerifyMsg(MyMessage &msg);
+	/**
+	 * @brief Does signing specific presentation for a node.
+	 *
+	 * This function makes sure any signing related presentation info is shared with the other part.
+	 * The presentation of the gateways signing preferences is done in @ref signerProcessInternal().
+	 * \n@b Usage: This function should be called by the presentation routine of the MySensors library.
+	 * You only need to call this directly from a sketch to set up a node to node signed message exchange.
+	 * If you do call this directly from a sketch, and you at some point change your sketch to go from
+	 * requiring signing to not requiring signatures, you need to present this change to the node at least
+	 * once, so it can update its requirements tables accordingly. Or it will keep believing that this node
+	 * require signatures and attempt to send signed messages to it.
+	 *
+	 * @param msg Message buffer to use.
+	 * @param destination Node ID of the destination.
+	 */
+	public: virtual void signerPresentation(MyMessage &msg, uint8_t destination);
 
-/**
- * @brief Initialize a hash calculation session.
- *
- * Any ongoing calculation session will be terminated/reset.
- */
-void signerSha256Init(void);
+	/**
+	 * @brief Manages internal signing message handshaking.
+	 *
+	 * This function takes care of signing related message handshaking such as nonce exchange.
+	 * \n@b Usage: This function should be called by the incoming message handler before any further message
+	 * processing is performed on internal messages. This function should only be called for @ref C_INTERNAL class
+	 * messages.
+	 *
+	 * @param msg Message buffer to process.
+	 * @returns @c true if caller should stop further message processing.
+	 */
+	public: virtual bool signerProcessInternal(MyMessage &msg);
 
-/**
- * @brief Add data to an ongoing hash calculation session.
- *
- * More data can be added by repeated calls to this function.
- *
- * @param data Buffer with data to add.
- * @param sz Size of data buffer.
- */
-void signerSha256Update(const uint8_t* data, size_t sz);
+	/**
+	 * @brief Check timeout of verification session.
+	 *
+	 * Nonce will be purged if it takes too long for a signed message to be sent to the receiver.
+	 * \n@b Usage: This function should be called on regular intervals, typically within some process loop.
+	 *
+	 * @returns @c true if session is still valid.
+	 */
+	public: virtual bool signerCheckTimer(void);
 
-/**
- * @brief Finalize an ongoing hash calculation session and return the hash.
- *
- * The returned hash size is always 32 bytes. Buffer can be assumed to be valid
- * until @ref signerSha256Init() is called again.
- *
- * @returns Buffer with 32-byte hash.
- */
-uint8_t* signerSha256Final(void);
+	/**
+	 * @brief Get nonce from provided message and store for signing operations.
+	 *
+	 * Returns @c false if subsystem is busy processing an ongoing signing operation.<br>
+	 * Returns @c false if signing identifier found in message is not supported by the used backend.<br>
+	 * If successful, this marks the start of a signing operation at the sending side so
+	 * implementation is expected to do any necessary initializations within this call.
+	 * \n@b Usage: This function is typically called as action when receiving a @ref I_NONCE_RESPONSE
+	 * message.
+	 *
+	 * @param msg The message to get the nonce from.
+	 * @returns @c true if successful, else @c false.
+	 */
+	public: virtual bool signerPutNonce(MyMessage &msg);
 
-/**
- * @brief Do a timing neutral memory comparison.
- *
- * The function behaves similar to memcmp with the difference that it will
- * always use the same number of instructions for a given number of bytes,
- * no matter how the two buffers differ and the response is either 0 or -1.
- *
- * @param a First buffer for comparison.
- * @param b Second buffer for comparison.
- * @param sz The number of bytes to compare.
- * @returns 0 if buffers match, -1 if they do not.
- */
-int signerMemcmp(const void* a, const void* b, size_t sz);
+	/**
+	 * @brief Signs provided message. All remaining space in message payload buffer is used for
+	 * signing identifier and signature.
+	 *
+	 * Nonce used for signature calculation is the one generated previously within @ref signerProcessInternal().<br>
+	 * Nonce will be cleared when this function is called to prevent re-use of nonce.<br>
+	 * Returns @c false if subsystem is busy processing an ongoing signing operation.<br>
+	 * Returns @c false if not two bytes or more of free payload space is left in provided message.<br>
+	 * This ends a signing operation at the sending side so implementation is expected to do any
+	 * deinitializations and enter a power saving state within this call.
+	 * \n@b Usage: This function is typically called as action when receiving a @ref I_NONCE_RESPONSE
+	 * message and after @ref signerPutNonce() has successfully been executed.
+	 *
+	 * @param msg The message to sign.
+	 * @returns @c true if successful, else @c false.
+	*/
+	public: virtual bool signerSignMsg(MyMessage &msg);
 
+	/**
+	 * @brief Verifies signature in provided message.
+	 *
+	 * Nonce used for verification is the one previously set using @ref signerPutNonce().<br>
+	 * Nonce will be cleared when this function is called to prevent re-use of nonce.<br>
+	 * Returns @c false if subsystem is busy processing an ongoing signing operation.<br>
+	 * Returns @c false if signing identifier found in message is not supported by the used backend.<br>
+	 * This ends a signing operation at the receiving side so implementation is expected to do any
+	 * deinitializations and enter a power saving state within this call.
+	 * \n@b Usage: This function is typically called when receiving a message that is flagged as signed
+	 * and @ref MY_SIGNING_REQUEST_SIGNATURES is activated.
+	 *
+	 * @param msg The message to verify.
+	 * @returns @c true if successful, else @c false.
+	 */
+	public: virtual bool signerVerifyMsg(MyMessage &msg);
+};
+
+class C_Signer : public C_ISigner
+{
+public:
+	C_Signer(C_Gateway *);
+
+	virtual void signerInit(void);
+
+	virtual void signerPresentation(MyMessage &msg, uint8_t destination);
+
+	virtual bool signerProcessInternal(MyMessage &msg);
+
+	virtual bool signerCheckTimer(void);
+
+	virtual bool signerPutNonce(MyMessage &msg);
+
+	virtual bool signerSignMsg(MyMessage &msg);
+
+	virtual bool signerVerifyMsg(MyMessage &msg);
+
+private: 
+	C_Gateway *m_Gateway;
+};
 #endif
 /** @}*/
 

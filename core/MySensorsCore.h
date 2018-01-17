@@ -71,6 +71,7 @@
 #include "MyConfig.h"
 #include "MyEepromAddresses.h"
 #include "MyMessage.h"
+#include "MyGatewayTransport.h"
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -106,23 +107,26 @@ typedef struct {
 	uint8_t reserved : 6;					//!< reserved
 } coreConfig_t;
 
-
+class C_ISigner;
 // **** public functions ********
-
+class C_Gateway : public C_IGatewayTransport
+{
+	private: C_ISigner *m_Signer;
+	public:
 /**
  * Return this nodes id.
  */
-uint8_t getNodeId(void);
+virtual uint8_t getNodeId(void);
 
 /**
  * Return the parent node id.
  */
-uint8_t getParentNodeId(void);
+virtual uint8_t getParentNodeId(void);
 
 /**
 * Sends node information to the gateway.
 */
-void presentNode(void);
+virtual void presentNode(void);
 
 /**
 * Each node must present all attached sensors before any values can be handled correctly by the controller.
@@ -216,25 +220,11 @@ bool requestTime(const bool ack = false);
  */
 controllerConfig_t getControllerConfig(void);
 
-/**
- * Save a state (in local EEPROM). Good for actuators to "remember" state between
- * power cycles.
- *
- * You have 256 bytes to play with. Note that there is a limitation on the number
- * of writes the EEPROM can handle (~100 000 cycles on ATMega328).
- *
- * @param pos The position to store value in (0-255)
- * @param value to store in position
- */
-void saveState(const uint8_t pos, const uint8_t value);
 
 /**
- * Load a state (from local EEPROM).
- *
- * @param pos The position to fetch value from  (0-255)
- * @return Value to store in position
- */
-uint8_t loadState(const uint8_t pos);
+* @brief Main framework process
+*/
+void _process(void);
 
 /**
  * Wait for a specified amount of time to pass.  Keeps process()ing.
@@ -257,12 +247,71 @@ void wait(const uint32_t waitingMS);
  */
 bool wait(const uint32_t waitingMS, const uint8_t cmd, const uint8_t msgtype);
 
-/**
- * Function to allow scheduler to do some work.
- * @remark Internally it will call yield, kick the watchdog and update led states.
- */
-void doYield(void);
+// **** private functions ********
 
+/**
+ * @defgroup MyLockgrp MyNodeLock
+ * @ingroup internals
+ * @brief API declaration for MyNodeLock
+ * @{
+ */
+/**
+ * @brief Lock a node and transmit provided message with 30m intervals
+ *
+ * This function is called if suspicious activity has exceeded the threshold (see
+ * @ref MY_NODE_LOCK_COUNTER_MAX). Unlocking with a normal Arduino bootloader require erasing the EEPROM
+ * while unlocking with a custom bootloader require holding @ref MY_NODE_UNLOCK_PIN low during power on/reset.
+ *
+ * @param str The string to transmit.
+ */
+void _nodeLock(const char* str);
+
+/**
+ * @brief Check node lock status and prevent node execution if locked.
+ */
+void _checkNodeLock(void);
+/** @}*/ // Node lock group
+
+/**
+* @brief Node initialisation
+*/
+void _begin(void);
+
+/**
+* @brief Processes internal messages
+* @return True if received message requires further processing
+*/
+bool _processInternalMessages(void);
+/**
+* @brief Puts node to a infinite loop if unrecoverable situation detected
+*/
+void _infiniteLoop(void);
+/**
+* @brief Handles registration request
+*/
+virtual void _registerNode(void);
+/**
+* @brief Sends message according to routing table
+* @param message
+* @return true Returns true if message reached the first stop on its way to destination.
+*/
+bool _sendRoute(MyMessage &message);
+
+/**
+* Sleep (PowerDownMode) the MCU and radio. Wake up on timer or pin change for two separate interrupts.
+* See: http://arduino.cc/en/Reference/attachInterrupt for details on modes and which pin
+* is assigned to what interrupt. On Nano/Pro Mini: 0=Pin2, 1=Pin3
+* @param sleepingMS Number of milliseconds to sleep or 0 to sleep forever
+* @param interrupt1 (optional) First interrupt that should trigger the wakeup
+* @param mode1 (optional) Mode for first interrupt (RISING, FALLING, CHANGE)
+* @param interrupt2 (optional) Second interrupt that should trigger the wakeup
+* @param mode2 (optional) Mode for second interrupt (RISING, FALLING, CHANGE)
+* @param smartSleep (optional) Set True if sending heartbeat and process incoming messages before going to sleep.
+* @return Interrupt number if wake up was triggered by pin change, @ref MY_WAKE_UP_BY_TIMER if wake up was triggered by timer, @ref MY_SLEEP_NOT_POSSIBLE if sleep was not possible (e.g. ongoing FW update)
+*/
+int8_t _sleep(const uint32_t sleepingMS, const bool smartSleep = false,
+              const uint8_t interrupt1 = INTERRUPT_NOT_DEFINED, const uint8_t mode1 = MODE_NOT_DEFINED,
+              const uint8_t interrupt2 = INTERRUPT_NOT_DEFINED, const uint8_t mode2 = MODE_NOT_DEFINED);
 
 /**
  * Sleep (PowerDownMode) the MCU and radio. Wake up on timer.
@@ -335,80 +384,20 @@ int8_t smartSleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t i
                   const uint8_t mode2, const uint32_t sleepingMS = 0);
 
 /**
-* Sleep (PowerDownMode) the MCU and radio. Wake up on timer or pin change for two separate interrupts.
-* See: http://arduino.cc/en/Reference/attachInterrupt for details on modes and which pin
-* is assigned to what interrupt. On Nano/Pro Mini: 0=Pin2, 1=Pin3
-* @param sleepingMS Number of milliseconds to sleep or 0 to sleep forever
-* @param interrupt1 (optional) First interrupt that should trigger the wakeup
-* @param mode1 (optional) Mode for first interrupt (RISING, FALLING, CHANGE)
-* @param interrupt2 (optional) Second interrupt that should trigger the wakeup
-* @param mode2 (optional) Mode for second interrupt (RISING, FALLING, CHANGE)
-* @param smartSleep (optional) Set True if sending heartbeat and process incoming messages before going to sleep.
-* @return Interrupt number if wake up was triggered by pin change, @ref MY_WAKE_UP_BY_TIMER if wake up was triggered by timer, @ref MY_SLEEP_NOT_POSSIBLE if sleep was not possible (e.g. ongoing FW update)
-*/
-int8_t _sleep(const uint32_t sleepingMS, const bool smartSleep = false,
-              const uint8_t interrupt1 = INTERRUPT_NOT_DEFINED, const uint8_t mode1 = MODE_NOT_DEFINED,
-              const uint8_t interrupt2 = INTERRUPT_NOT_DEFINED, const uint8_t mode2 = MODE_NOT_DEFINED);
-
-
-// **** private functions ********
-
-/**
- * @defgroup MyLockgrp MyNodeLock
- * @ingroup internals
- * @brief API declaration for MyNodeLock
- * @{
- */
-/**
- * @brief Lock a node and transmit provided message with 30m intervals
- *
- * This function is called if suspicious activity has exceeded the threshold (see
- * @ref MY_NODE_LOCK_COUNTER_MAX). Unlocking with a normal Arduino bootloader require erasing the EEPROM
- * while unlocking with a custom bootloader require holding @ref MY_NODE_UNLOCK_PIN low during power on/reset.
- *
- * @param str The string to transmit.
- */
-void _nodeLock(const char* str);
-
-/**
- * @brief Check node lock status and prevent node execution if locked.
- */
-void _checkNodeLock(void);
-/** @}*/ // Node lock group
-
-/**
-* @brief Node initialisation
-*/
-void _begin(void);
-/**
-* @brief Main framework process
-*/
-void _process(void);
-/**
-* @brief Processes internal messages
-* @return True if received message requires further processing
-*/
-bool _processInternalMessages(void);
-/**
-* @brief Puts node to a infinite loop if unrecoverable situation detected
-*/
-void _infiniteLoop(void);
-/**
-* @brief Handles registration request
-*/
-void _registerNode(void);
-/**
-* @brief Sends message according to routing table
-* @param message
-* @return true Returns true if message reached the first stop on its way to destination.
-*/
-bool _sendRoute(MyMessage &message);
-
-/**
 * @brief Callback for incoming messages
 * @param message
 */
 void receive(const MyMessage &message)  __attribute__((weak));
+
+// Inline function and macros
+MyMessage& build(MyMessage &msg, const uint8_t destination, const uint8_t sensor,
+                               const uint8_t command, const uint8_t type, const bool ack = false);
+
+MyMessage& buildGw(MyMessage &msg, const uint8_t type);
+
+friend class C_Signer;
+};
+
 /**
 * @brief Callback for incoming time messages
 */
@@ -435,32 +424,31 @@ void setup(void) __attribute__((weak));
 void loop(void) __attribute__((weak));
 
 
-// Inline function and macros
-static inline MyMessage& build(MyMessage &msg, const uint8_t destination, const uint8_t sensor,
-                               const uint8_t command, const uint8_t type, const bool ack = false)
-{
-	msg.sender = getNodeId();
-	msg.destination = destination;
-	msg.sensor = sensor;
-	msg.type = type;
-	mSetCommand(msg,command);
-	mSetRequestAck(msg,ack);
-	mSetAck(msg,false);
-	return msg;
-}
+/**
+ * Save a state (in local EEPROM). Good for actuators to "remember" state between
+ * power cycles.
+ *
+ * You have 256 bytes to play with. Note that there is a limitation on the number
+ * of writes the EEPROM can handle (~100 000 cycles on ATMega328).
+ *
+ * @param pos The position to store value in (0-255)
+ * @param value to store in position
+ */
+void saveState(const uint8_t pos, const uint8_t value);
 
-static inline MyMessage& buildGw(MyMessage &msg, const uint8_t type)
-{
-	msg.sender = GATEWAY_ADDRESS;
-	msg.destination = GATEWAY_ADDRESS;
-	msg.sensor = NODE_SENSOR_ID;
-	msg.type = type;
-	mSetCommand(msg, C_INTERNAL);
-	mSetRequestAck(msg, false);
-	mSetAck(msg, false);
-	return msg;
-}
+/**
+ * Load a state (from local EEPROM).
+ *
+ * @param pos The position to fetch value from  (0-255)
+ * @return Value to store in position
+ */
+uint8_t loadState(const uint8_t pos);
 
+/**
+ * Function to allow scheduler to do some work.
+ * @remark Internally it will call yield, kick the watchdog and update led states.
+ */
+void doYield(void);
 
 #endif
 

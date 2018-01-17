@@ -18,6 +18,7 @@
  */
 
 #include "MySensorsCore.h"
+#include "MySigning.h"
 
 #if defined(__linux__)
 #include <stdlib.h>
@@ -43,18 +44,19 @@ char _convBuf[MAX_PAYLOAD*2+1];
 #endif
 
 // Callback for transport=ok transition
-void _callbackTransportReady(void)
+void _callbackTransportReady(void* data)
 {
 	if (!_coreConfig.presentationSent) {
+		C_IGatewayTransport *gw = (C_IGatewayTransport *)data;
 #if !defined(MY_GATEWAY_FEATURE)	// GW calls presentNode() when client connected
-		presentNode();
+		gw->presentNode();
 #endif
-		_registerNode();
+		gw->_registerNode();
 		_coreConfig.presentationSent = true;
 	}
 }
 
-void _process(void)
+void C_Gateway::_process(void)
 {
 	doYield();
 
@@ -76,7 +78,7 @@ void _process(void)
 #endif
 }
 
-void _infiniteLoop(void)
+void C_Gateway::_infiniteLoop(void)
 {
 	while(1) {
 		doYield();
@@ -86,7 +88,7 @@ void _infiniteLoop(void)
 	}
 }
 
-void _begin(void)
+void C_Gateway::_begin(void)
 {
 	// reset wdt
 	hwWatchdogReset();
@@ -123,7 +125,8 @@ void _begin(void)
 	ledsInit();
 #endif
 
-	signerInit();
+	m_Signer = new C_Signer(this);
+	m_Signer->signerInit();
 
 	// Read latest received controller configuration from EEPROM
 	// Note: _coreConfig.isMetric is bool, hence empty EEPROM (=0xFF) evaluates to true (default)
@@ -141,7 +144,7 @@ void _begin(void)
 	// Initialise transport layer
 	transportInitialise();
 	// Register transport=ready callback
-	transportRegisterReadyCallback(_callbackTransportReady);
+	transportRegisterReadyCallback(_callbackTransportReady, this);
 	// wait until transport is ready
 	(void)transportWaitUntilReady(MY_TRANSPORT_WAIT_READY_MS);
 #endif
@@ -171,7 +174,7 @@ void _begin(void)
 	CORE_DEBUG(PSTR("MCO:BGN:INIT OK,TSP=%" PRIu8 "\n"), isTransportReady());
 #else
 	// no sensor network defined, call presentation & registration
-	_callbackTransportReady();
+	_callbackTransportReady(this);
 	CORE_DEBUG(PSTR("MCO:BGN:INIT OK,TSP=NA\n"));
 #endif
 	// reset wdt before handing over to loop
@@ -179,7 +182,7 @@ void _begin(void)
 }
 
 
-void _registerNode(void)
+void C_Gateway::_registerNode(void)
 {
 #if defined (MY_REGISTRATION_FEATURE) && !defined(MY_GATEWAY_FEATURE)
 	CORE_DEBUG(PSTR("MCO:REG:REQ\n"));	// registration request
@@ -197,7 +200,7 @@ void _registerNode(void)
 #endif
 }
 
-void presentNode(void)
+void C_Gateway::presentNode(void)
 {
 	setIndication(INDICATION_PRESENT);
 	// Present node and request config
@@ -240,7 +243,7 @@ void presentNode(void)
 }
 
 
-uint8_t getNodeId(void)
+uint8_t C_Gateway::getNodeId(void)
 {
 	uint8_t result;
 #if defined(MY_GATEWAY_FEATURE)
@@ -253,7 +256,7 @@ uint8_t getNodeId(void)
 	return result;
 }
 
-uint8_t getParentNodeId(void)
+uint8_t C_Gateway::getParentNodeId(void)
 {
 	uint8_t result;
 #if defined(MY_GATEWAY_FEATURE)
@@ -279,13 +282,13 @@ uint8_t getDistanceGW(void)
 	return result;
 }
 
-controllerConfig_t getControllerConfig(void)
+controllerConfig_t C_Gateway::getControllerConfig(void)
 {
 	return _coreConfig.controllerConfig;
 }
 
 
-bool _sendRoute(MyMessage &message)
+bool C_Gateway::_sendRoute(MyMessage &message)
 {
 #if defined(MY_CORE_ONLY)
 	(void)message;
@@ -304,7 +307,7 @@ bool _sendRoute(MyMessage &message)
 #endif
 }
 
-bool send(MyMessage &message, const bool enableAck)
+bool C_Gateway::send(MyMessage &message, const bool enableAck)
 {
 	message.sender = getNodeId();
 	mSetCommand(message, C_SET);
@@ -322,13 +325,13 @@ bool send(MyMessage &message, const bool enableAck)
 #endif
 }
 
-bool sendBatteryLevel(const uint8_t value, const bool ack)
+bool C_Gateway::sendBatteryLevel(const uint8_t value, const bool ack)
 {
 	return _sendRoute(build(_msgTmp, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_BATTERY_LEVEL,
 	                        ack).set(value));
 }
 
-bool sendHeartbeat(const bool ack)
+bool C_Gateway::sendHeartbeat(const bool ack)
 {
 #if defined(MY_SENSOR_NETWORK)
 	const uint32_t heartbeat = transportGetHeartbeat();
@@ -342,14 +345,14 @@ bool sendHeartbeat(const bool ack)
 
 
 
-bool present(const uint8_t childSensorId, const uint8_t sensorType, const char *description,
+bool C_Gateway::present(const uint8_t childSensorId, const uint8_t sensorType, const char *description,
              const bool ack)
 {
 	return _sendRoute(build(_msgTmp, GATEWAY_ADDRESS, childSensorId, C_PRESENTATION, sensorType,
 	                        ack).set(childSensorId==NODE_SENSOR_ID?MYSENSORS_LIBRARY_VERSION:description));
 }
 
-bool sendSketchInfo(const char *name, const char *version, const bool ack)
+bool C_Gateway::sendSketchInfo(const char *name, const char *version, const bool ack)
 {
 	bool result = true;
 	if (name) {
@@ -364,7 +367,7 @@ bool sendSketchInfo(const char *name, const char *version, const bool ack)
 }
 
 #if !defined(__linux__)
-bool sendSketchInfo(const __FlashStringHelper *name, const __FlashStringHelper *version,
+bool C_Gateway::sendSketchInfo(const __FlashStringHelper *name, const __FlashStringHelper *version,
                     const bool ack)
 {
 	bool result = true;
@@ -380,18 +383,18 @@ bool sendSketchInfo(const __FlashStringHelper *name, const __FlashStringHelper *
 }
 #endif
 
-bool request(const uint8_t childSensorId, const uint8_t variableType, const uint8_t destination)
+bool C_Gateway::request(const uint8_t childSensorId, const uint8_t variableType, const uint8_t destination)
 {
 	return _sendRoute(build(_msgTmp, destination, childSensorId, C_REQ, variableType).set(""));
 }
 
-bool requestTime(const bool ack)
+bool C_Gateway::requestTime(const bool ack)
 {
 	return _sendRoute(build(_msgTmp, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_TIME, ack).set(""));
 }
 
 // Message delivered through _msg
-bool _processInternalMessages(void)
+bool C_Gateway::_processInternalMessages(void)
 {
 	const uint8_t type = _msg.type;
 
@@ -504,7 +507,7 @@ uint8_t loadState(const uint8_t pos)
 }
 
 
-void wait(const uint32_t waitingMS)
+void C_Gateway::wait(const uint32_t waitingMS)
 {
 	const uint32_t enteringMS = hwMillis();
 	while (hwMillis() - enteringMS < waitingMS) {
@@ -512,7 +515,7 @@ void wait(const uint32_t waitingMS)
 	}
 }
 
-bool wait(const uint32_t waitingMS, const uint8_t cmd, const uint8_t msgType)
+bool C_Gateway::wait(const uint32_t waitingMS, const uint8_t cmd, const uint8_t msgType)
 {
 	const uint32_t enteringMS = hwMillis();
 	// invalidate msg type
@@ -536,7 +539,32 @@ void doYield(void)
 #endif
 }
 
-int8_t _sleep(const uint32_t sleepingMS, const bool smartSleep, const uint8_t interrupt1,
+MyMessage& C_Gateway::buildGw(MyMessage &msg, const uint8_t type)
+{
+	msg.sender = GATEWAY_ADDRESS;
+	msg.destination = GATEWAY_ADDRESS;
+	msg.sensor = NODE_SENSOR_ID;
+	msg.type = type;
+	mSetCommand(msg, C_INTERNAL);
+	mSetRequestAck(msg, false);
+	mSetAck(msg, false);
+	return msg;
+}
+
+MyMessage& C_Gateway::build(MyMessage &msg, const uint8_t destination, const uint8_t sensor,
+                               const uint8_t command, const uint8_t type, const bool ack)
+{
+	msg.sender = getNodeId();
+	msg.destination = destination;
+	msg.sensor = sensor;
+	msg.type = type;
+	mSetCommand(msg,command);
+	mSetRequestAck(msg,ack);
+	mSetAck(msg,false);
+	return msg;
+}
+
+int8_t C_Gateway::_sleep(const uint32_t sleepingMS, const bool smartSleep, const uint8_t interrupt1,
               const uint8_t mode1, const uint8_t interrupt2, const uint8_t mode2)
 {
 	CORE_DEBUG(PSTR("MCO:SLP:MS=%" PRIu32 ",SMS=%" PRIu8 ",I1=%" PRIu8 ",M1=%" PRIu8 ",I2=%" PRIu8
@@ -644,46 +672,44 @@ int8_t _sleep(const uint32_t sleepingMS, const bool smartSleep, const uint8_t in
 }
 
 // sleep functions
-int8_t sleep(const uint32_t sleepingMS, const bool smartSleep)
+int8_t C_Gateway::sleep(const uint32_t sleepingMS, const bool smartSleep)
 {
 	return _sleep(sleepingMS, smartSleep);
 }
 
-int8_t sleep(const uint8_t interrupt, const uint8_t mode, const uint32_t sleepingMS,
+int8_t C_Gateway::sleep(const uint8_t interrupt, const uint8_t mode, const uint32_t sleepingMS,
              const bool smartSleep)
 {
 	return _sleep(sleepingMS, smartSleep, interrupt, mode);
 }
 
-int8_t sleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t interrupt2,
+int8_t C_Gateway::sleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t interrupt2,
              const uint8_t mode2, const uint32_t sleepingMS, const bool smartSleep)
 {
 	return _sleep(sleepingMS, smartSleep, interrupt1, mode1, interrupt2, mode2);
 }
 
 // deprecated smartSleep() functions
-int8_t smartSleep(const uint32_t sleepingMS)
+int8_t C_Gateway::smartSleep(const uint32_t sleepingMS)
 {
 	// compatibility
 	return _sleep(sleepingMS, true);
 }
 
-int8_t smartSleep(const uint8_t interrupt, const uint8_t mode, const uint32_t sleepingMS)
+int8_t C_Gateway::smartSleep(const uint8_t interrupt, const uint8_t mode, const uint32_t sleepingMS)
 {
 	// compatibility
 	return _sleep(sleepingMS, true, interrupt, mode);
 }
 
-int8_t smartSleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t interrupt2,
+int8_t C_Gateway::smartSleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t interrupt2,
                   const uint8_t mode2, const uint32_t sleepingMS)
 {
 	// compatibility
 	return _sleep(sleepingMS, true, interrupt1, mode1, interrupt2, mode2);
 }
 
-
-
-void _nodeLock(const char* str)
+void C_Gateway::_nodeLock(const char* str)
 {
 #ifdef MY_NODE_LOCK_FEATURE
 	// Make sure EEPROM is updated to locked status
@@ -707,7 +733,7 @@ void _nodeLock(const char* str)
 #endif
 }
 
-void _checkNodeLock(void)
+void C_Gateway::_checkNodeLock(void)
 {
 #ifdef MY_NODE_LOCK_FEATURE
 	// Check if node has been locked down
