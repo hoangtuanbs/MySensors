@@ -650,7 +650,7 @@ class C_SHA256Util
 
 class C_ISigner
 {
-	public: virtual void signerInit(void);
+	public: virtual void signerInit(void) = 0;
 
 	/**
 	 * @brief Does signing specific presentation for a node.
@@ -667,7 +667,7 @@ class C_ISigner
 	 * @param msg Message buffer to use.
 	 * @param destination Node ID of the destination.
 	 */
-	public: virtual void signerPresentation(MyMessage &msg, uint8_t destination);
+	public: virtual void signerPresentation(MyMessage &msg, uint8_t destination)  = 0;
 
 	/**
 	 * @brief Manages internal signing message handshaking.
@@ -680,7 +680,7 @@ class C_ISigner
 	 * @param msg Message buffer to process.
 	 * @returns @c true if caller should stop further message processing.
 	 */
-	public: virtual bool signerProcessInternal(MyMessage &msg);
+	public: virtual bool signerProcessInternal(MyMessage &msg)  = 0;
 
 	/**
 	 * @brief Check timeout of verification session.
@@ -690,7 +690,7 @@ class C_ISigner
 	 *
 	 * @returns @c true if session is still valid.
 	 */
-	public: virtual bool signerCheckTimer(void);
+	public: virtual bool signerCheckTimer(void)  = 0;
 
 	/**
 	 * @brief Get nonce from provided message and store for signing operations.
@@ -705,7 +705,7 @@ class C_ISigner
 	 * @param msg The message to get the nonce from.
 	 * @returns @c true if successful, else @c false.
 	 */
-	public: virtual bool signerPutNonce(MyMessage &msg);
+	public: virtual bool signerPutNonce(MyMessage &msg)  = 0;
 
 	/**
 	 * @brief Signs provided message. All remaining space in message payload buffer is used for
@@ -723,7 +723,7 @@ class C_ISigner
 	 * @param msg The message to sign.
 	 * @returns @c true if successful, else @c false.
 	*/
-	public: virtual bool signerSignMsg(MyMessage &msg);
+	public: virtual bool signerSignMsg(MyMessage &msg)  = 0;
 
 	/**
 	 * @brief Verifies signature in provided message.
@@ -740,7 +740,7 @@ class C_ISigner
 	 * @param msg The message to verify.
 	 * @returns @c true if successful, else @c false.
 	 */
-	public: virtual bool signerVerifyMsg(MyMessage &msg);
+	public: virtual bool signerVerifyMsg(MyMessage &msg)  = 0;
 };
 
 class C_Signer : public C_ISigner

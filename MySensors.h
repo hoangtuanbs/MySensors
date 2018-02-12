@@ -60,7 +60,7 @@
 #if defined(ARDUINO_ARCH_ESP8266)
 #include "hal/architecture/ESP8266/MyHwESP8266.cpp"
 #elif defined(ARDUINO_ARCH_ESP32)
-#include "hal/architecture/ESP32/MyHwESP32.cpp"
+#include "hal/architecture/ESP32/MyHwESP32.h"
 #elif defined(ARDUINO_ARCH_AVR)
 #include "drivers/AVR/DigitalWriteFast/digitalWriteFast.h"
 #include "hal/architecture/AVR/MyHwAVR.cpp"
@@ -91,23 +91,23 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #endif
 
 #if defined(MY_DEFAULT_RX_LED_PIN) || defined(MY_DEFAULT_TX_LED_PIN) || defined(MY_DEFAULT_ERR_LED_PIN)
-#include "core/MyLeds.cpp"
+#include "core/MyLeds.h"
 #else
 #include "core/MyLeds.h"
 #endif
 
-#include "core/MyIndication.cpp"
+#include "core/MyIndication.h"
 
 
 // INCLUSION MODE
 #if defined(MY_INCLUSION_MODE_FEATURE)
-#include "core/MyInclusionMode.cpp"
+#include "core/MyInclusionMode.h"
 #endif
 
 
 // SIGNING
-#include "core/MySigning.cpp"
-#include "drivers/ATSHA204/sha256.cpp"
+#include "core/MySigning.h"
+#include "drivers/ATSHA204/sha256.h"
 #if defined(MY_SIGNING_FEATURE)
 // SIGNING COMMON FUNCTIONS
 #if defined(MY_SIGNING_ATSHA204) && defined(MY_SIGNING_SOFT)
@@ -169,7 +169,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #error You must define a unique MY_MQTT_CLIENT_ID for this MQTT client
 #endif
 
-#include "core/MyGatewayTransport.cpp"
+//#include "core/MyGatewayTransport.h"
 #include "core/MyProtocolMySensors.cpp"
 
 #if defined(MY_GATEWAY_LINUX)
@@ -177,13 +177,13 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #include "drivers/Linux/EthernetServer.h"
 #include "drivers/Linux/IPAddress.h"
 #endif
-#include "drivers/PubSubClient/PubSubClient.cpp"
-#include "core/MyGatewayTransportMQTTClient.cpp"
+#include "drivers/PubSubClient/PubSubClient.h"
+//#include "core/MyGatewayTransportMQTTClient.cpp"
 #elif defined(MY_GATEWAY_FEATURE)
 // GATEWAY - COMMON FUNCTIONS
-#include "core/MyGatewayTransport.cpp"
+#include "core/MyGatewayTransport.h"
 
-#include "core/MyProtocolMySensors.cpp"
+#include "core/MyProtocolMySensors.h"
 
 // GATEWAY - CONFIGURATION
 #if defined(MY_SENSOR_NETWORK)
@@ -370,7 +370,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #endif
 #endif
 
-#include "core/MyTransport.cpp"
+#include "core/MyTransport.h"
 #endif
 
 // Make sure to disable child features when parent feature is disabled
@@ -386,16 +386,10 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #undef MY_INCLUSION_BUTTON_FEATURE
 #endif
 
-#if !defined(MY_CORE_ONLY)
-#if !defined(MY_GATEWAY_FEATURE) && !defined(MY_SENSOR_NETWORK)
-#error No forward link or gateway feature activated. This means nowhere to send messages! Pretty pointless.
-#endif
-#endif
-
 #include "core/MyCapabilities.h"
-#include "core/MyMessage.cpp"
-#include "core/MySplashScreen.cpp"
-#include "core/MySensorsCore.cpp"
+#include "core/MyMessage.h"
+#include "core/MySplashScreen.h"
+#include "core/MySensorsCore.h"
 
 // HW mains
 #if !defined(MY_CORE_ONLY)

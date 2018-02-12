@@ -75,6 +75,7 @@
 
 #include "MyProtocol.h"
 #include "MySensorsCore.h"
+#include "MyMessage.h"
 
 #define MSG_GW_STARTUP_COMPLETE "Gateway startup complete."		//!< Gateway startup message
 
@@ -141,6 +142,9 @@ class C_IGatewayTransport
 	public: virtual void receive(const MyMessage &message);
 
 	private: virtual bool _processInternalMessages(void);
+
+	private: MyMessage _msg;
+	private: MyMessage _msgTmp;
 };
 
 

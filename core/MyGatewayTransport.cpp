@@ -18,19 +18,17 @@
  */
 
 #include "MyGatewayTransport.h"
-
+#include "MyMessage.h"
 extern bool transportSendRoute(MyMessage &message);
 
 // global variables
-extern MyMessage _msg;
-extern MyMessage _msgTmp;
-
 void C_IGatewayTransport::gatewayTransportProcess(void)
 {
-	if (gatewayTransportAvailable()) {
+	if (gatewayTransportAvailable()) 
+	{
 		_msg = gatewayTransportReceive();
-		if (_msg.destination == GATEWAY_ADDRESS) {
-
+		if (_msg.destination == GATEWAY_ADDRESS) 
+		{
 			// Check if sender requests an ack back.
 			if (mGetRequestAck(_msg)) {
 				// Copy message
@@ -42,7 +40,8 @@ void C_IGatewayTransport::gatewayTransportProcess(void)
 				_msgTmp.destination = _msg.sender;
 				gatewayTransportSend(_msgTmp);
 			}
-			if (mGetCommand(_msg) == C_INTERNAL) {
+			if (mGetCommand(_msg) == C_INTERNAL) 
+			{
 				if (_msg.type == I_VERSION) {
 					// Request for version. Create the response
 					gatewayTransportSend(buildGw(_msgTmp, I_VERSION).set(MYSENSORS_LIBRARY_VERSION));

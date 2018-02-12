@@ -20,7 +20,9 @@
 
 // Topic structure: MY_MQTT_PUBLISH_TOPIC_PREFIX/NODE-ID/SENSOR-ID/CMD-TYPE/ACK-FLAG/SUB-TYPE
 
+#include "PubSubClient.h"
 #include "MyGatewayTransport.h"
+#include "MyMessage.h"
 
 #if defined MY_CONTROLLER_IP_ADDRESS
 IPAddress _brokerIp(MY_CONTROLLER_IP_ADDRESS);
@@ -43,15 +45,18 @@ IPAddress _subnetIp(255, 255, 255, 0);
 #endif /* End of MY_IP_ADDRESS */
 
 #if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
-#define EthernetClient WiFiClient
+static WiFiClient _MQTT_ethClient;
+static PubSubClient _MQTT_client(_MQTT_ethClient);
 #elif defined(MY_GATEWAY_LINUX)
 // Nothing to do here
+static EthernetClient _MQTT_ethClient;
+static PubSubClient _MQTT_client(_MQTT_ethClient);
 #else
 uint8_t _MQTT_clientMAC[] = { MY_MAC_ADDRESS };
 #endif /* End of MY_GATEWAY_ESP8266 */
 
-static EthernetClient _MQTT_ethClient;
-static PubSubClient _MQTT_client(_MQTT_ethClient);
+
+
 static bool _MQTT_connecting = true;
 static bool _MQTT_available = false;
 static MyMessage _MQTT_msg;
@@ -203,3 +208,4 @@ MyMessage & C_IGatewayTransport::gatewayTransportReceive(void)
 	_MQTT_available = false;
 	return _MQTT_msg;
 }
+

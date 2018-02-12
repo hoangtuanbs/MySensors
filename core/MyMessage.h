@@ -31,7 +31,7 @@
 #ifndef MyMessage_h
 #define MyMessage_h
 
-#ifdef __cplusplus
+#if true
 #include <Arduino.h>
 #include <stdint.h>
 #endif
@@ -276,7 +276,7 @@ typedef enum {
 
 
 #if !DOXYGEN
-#ifdef __cplusplus
+#if true
 class MyMessage
 {
 private:

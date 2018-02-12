@@ -218,7 +218,7 @@ void C_Gateway::presentNode(void)
 #endif
 
 	// Send signing preferences for this node to the GW
-	signerPresentation(_msgTmp, GATEWAY_ADDRESS);
+	m_Signer->signerPresentation(_msgTmp, GATEWAY_ADDRESS);
 
 	// Send presentation for this radio node
 #if defined(MY_REPEATER_FEATURE)
